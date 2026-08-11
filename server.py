@@ -11,8 +11,11 @@ POST /generate
   JSON body:
     prompt          (str, required)
     steps           (int, default 8)     -- Turbo is distilled for ~8 steps
-    cfg             (float, default 0.0) -- Turbo runs with CFG=0/1, not the
-                                            7-12 range typical of SD1.5/SDXL
+    cfg             (float, default 1.0)  -- 0.0 puts the sampler in fully
+                                            unconditioned mode (prompt is
+                                            ignored); 1.0 is "CFG disabled"
+                                            for distilled/Turbo models while
+                                            still following the prompt
     width           (int, default 1024)
     height          (int, default 1024)
     seed            (int, optional)      -- omitted -> random seed each call
@@ -60,7 +63,12 @@ def generate():
         return jsonify(error="'prompt' is required"), 400
 
     steps = int(body.get("steps", 8))
-    cfg = float(body.get("cfg", 0.0))
+    # NOTE: 0.0 is NOT "CFG off but still conditioned" — stable-diffusion.cpp
+    # treats exactly 0.0 as fully unconditioned mode, silently ignoring the
+    # prompt (see its own warning: "unconditioned mode, images won't follow
+    # the prompt (use cfg-scale=1 for distilled models)"). 1.0 is what
+    # actually gives prompt-following, guidance-free sampling for Turbo.
+    cfg = float(body.get("cfg", 1.0))
     width = int(body.get("width", 1024))
     height = int(body.get("height", 1024))
     seed = body.get("seed")
