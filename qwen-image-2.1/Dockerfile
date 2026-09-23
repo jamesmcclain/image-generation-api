@@ -158,6 +158,24 @@ RUN if [ "${WITH_COMFYUI}" = "1" ]; then \
         pip install -r /opt/ComfyUI/custom_nodes/ComfyUI-GGUF/requirements.txt; \
     fi
 
+# A C toolchain for Triton, which PyTorch 2.14 uses at runtime even without
+# torch.compile: some ordinary ops (e.g. the small matmul in the Qwen3-VL text
+# encoder's rotary position setup) are routed to Triton kernels, and Triton
+# compiles a small C launcher (against Python.h, linking the driver's
+# libcuda.so.1) the first time it runs. Without this, ComfyUI fails with
+# "RuntimeError: Failed to find C compiler". libc6-dev and python3-dev are
+# listed explicitly because --no-install-recommends won't pull in headers.
+# Kept as its own layer so adding it doesn't invalidate the large
+# PyTorch/ComfyUI layer above. (api mode doesn't use PyTorch, so it's skipped
+# with WITH_COMFYUI=0.)
+RUN if [ "${WITH_COMFYUI}" = "1" ]; then \
+        apt-get update && apt-get install -y --no-install-recommends \
+            gcc \
+            libc6-dev \
+            python3-dev \
+        && rm -rf /var/lib/apt/lists/*; \
+    fi
+
 # ---------------------------------------------------------------------------
 
 WORKDIR /app
