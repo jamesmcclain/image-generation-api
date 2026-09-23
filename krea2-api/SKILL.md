@@ -9,7 +9,10 @@ license: Proprietary. LICENSE.txt has complete terms
 ## Overview
 
 Text-to-image generation is available via a REST API at
-`http://10.0.2.2:5002` (or wherever the container's port is mapped).
+`http://10.0.2.2:5002` by default. Both scripts take `--host` and `--port`
+to reach a server elsewhere (e.g. `--host localhost`, or `--port 5003` for a
+second container mapped beside the first); use the same values for every
+call in a session.
 `/generate` synthesizes an image from a prompt; the response body is the
 raw PNG bytes on success, or a JSON error object on failure.
 
@@ -54,6 +57,7 @@ non-PNG response, `4` network error.
 **Health check:**
 ```bash
 python3 scripts/health_check.py
+python3 scripts/health_check.py --host localhost --port 5003
 # -> OK
 # -> NOT_READY {...}
 ```
@@ -64,9 +68,10 @@ repeatedly.
 
 **Options for `generate.py`:** positional `PROMPT`, plus `--out PATH`
 (required), `--steps N`, `--cfg F`, `--width N`, `--height N`, `--seed N`,
-and `--timeout SECONDS` (default 600, matching the server's own internal
-timeout). Don't pass anything else — the server only accepts the
-documented fields.
+`--timeout SECONDS` (default 600, matching the server's own internal
+timeout), and `--host HOST` / `--port PORT` (default `10.0.2.2` / `5002`).
+`health_check.py` takes only `--host` and `--port`. Don't pass anything
+else — the server only accepts the documented fields.
 
 ## Request Options
 
@@ -167,4 +172,5 @@ Always `file output.png` afterwards to confirm the resize succeeded.
 | Generate with a fixed seed (reproducible) | add `--seed 42` |
 | Generate at a specific size | add `--width 1647 --height 926` (stay within a ceiling above) |
 | Health check | `python3 scripts/health_check.py` |
+| Use a different server | add `--host HOST --port PORT` to either script |
 | Upscale PNG 2× with Lanczos | `convert in.png -filter Lanczos -resize WxH out.png` |

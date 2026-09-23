@@ -7,9 +7,9 @@
 #      machines on the same network, via a port mapping.
 #
 # Usage:
-#   ./run.sh                          # uses default MODEL_DIR
-#   ./run.sh /path/to/gguf-models     # overrides MODEL_DIR for this run
-#   MODEL_FILE=other-quant.gguf ./run.sh
+#   ./krea2/run.sh                          # uses default MODEL_DIR
+#   ./krea2/run.sh /path/to/gguf-models     # overrides MODEL_DIR for this run
+#   MODEL_FILE=other-quant.gguf ./krea2/run.sh
 #
 # (MODEL_DIR defaults to $HOME/.cache/huggingface/gguf if not set and no
 # argument is given. Krea2 needs three files present in MODEL_DIR:
@@ -48,7 +48,7 @@ done
 # # Build the image if it doesn't already exist locally.
 # if ! docker image inspect "${IMAGE_NAME}" >/dev/null 2>&1; then
 #     echo "Image ${IMAGE_NAME} not found locally — building it now..."
-#     docker build -t "${IMAGE_NAME}" .
+#     docker build -t "${IMAGE_NAME}" "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # fi
 
 # # Remove any previous container with the same name so re-running is idempotent.

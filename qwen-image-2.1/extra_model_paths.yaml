@@ -1,0 +1,22 @@
+# Points ComfyUI at the read-only /models mount (the same directory the API
+# mode reads), which uses ComfyUI's standard folder layout:
+#
+#   /models/diffusion_models/qwen_image_2.1_int8_convrot.safetensors
+#   /models/text_encoders/qwen3vl_8b_int8_convrot.safetensors   (comfyui mode)
+#   /models/text_encoders/Qwen3-VL-8B-Instruct-Q4_K_M.gguf      (api mode)
+#   /models/vae/qwen_image_2.1_vae_bf16.safetensors
+#
+# ComfyUI also keeps its own (writable) models folder under COMFYUI_DATA, so
+# anything downloaded from inside the UI lands there instead.
+qwen_image_models:
+  base_path: /models
+  diffusion_models: diffusion_models
+  text_encoders: text_encoders
+  vae: vae
+  loras: loras
+
+# Custom nodes baked into the image (ComfyUI-GGUF, for .gguf diffusion
+# models). --base-directory points ComfyUI's own custom_nodes folder at
+# COMFYUI_DATA/custom_nodes, so this keeps the bundled ones loading too.
+bundled_custom_nodes:
+  custom_nodes: /opt/ComfyUI/custom_nodes
