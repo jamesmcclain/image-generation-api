@@ -9,6 +9,10 @@ transcript or a JSON dump.
 Usage:
     generate.py "a red fox sitting in fresh snow, golden hour" --out output.png
     generate.py "..." --out output.png --width 1647 --height 926 --seed 42
+    generate.py "..." --out output.png --host localhost --port 5003
+
+--host/--port pick the server (default 10.0.2.2:5002, the address this skill
+has always used).
 
 Guards against the cfg trap: refuses to send cfg=0.0 unless you pass
 --force-cfg-zero, since that value silently ignores the prompt with no
@@ -30,7 +34,8 @@ import sys
 
 import requests
 
-BASE_URL = "http://10.0.2.2:5002"
+DEFAULT_HOST = "10.0.2.2"
+DEFAULT_PORT = 5002
 
 # (max_width, max_height) for the three documented aspect ratios.
 _CEILINGS = [
@@ -40,6 +45,13 @@ _CEILINGS = [
 ]
 
 
+def base_url(host: str, port: int) -> str:
+    # Bracket bare IPv6 addresses, e.g. ::1 -> http://[::1]:5002
+    if ":" in host and not host.startswith("["):
+        host = f"[{host}]"
+    return f"http://{host}:{port}"
+
+
 def _over_ceiling(width: int, height: int) -> bool:
     # A request fits if there's some documented ceiling it's within on
     # both axes. If it exceeds every ceiling on at least one axis, reject.
@@ -47,7 +59,7 @@ def _over_ceiling(width: int, height: int) -> bool:
 
 
 def main() -> int:
-    ap = argparse.ArgumentParser(description=__doc__)
+    ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("prompt")
     ap.add_argument("--out", required=True, help="Output .png path")
     ap.add_argument("--steps", type=int, default=None)
@@ -62,6 +74,10 @@ def main() -> int:
         "You almost never want this.",
     )
     ap.add_argument("--timeout", type=float, default=600)
+    ap.add_argument("--host", default=DEFAULT_HOST,
+                    help=f"API server host (default: {DEFAULT_HOST})")
+    ap.add_argument("--port", type=int, default=DEFAULT_PORT,
+                    help=f"API server port (default: {DEFAULT_PORT})")
     args = ap.parse_args()
 
     if args.cfg == 0.0 and not args.force_cfg_zero:
@@ -94,7 +110,7 @@ def main() -> int:
         payload["seed"] = args.seed
 
     try:
-        r = requests.post(f"{BASE_URL}/generate", json=payload, timeout=args.timeout)
+        r = requests.post(f"{base_url(args.host, args.port)}/generate", json=payload, timeout=args.timeout)
     except requests.RequestException as e:
         print(f"ERROR request failed: {e}")
         return 4

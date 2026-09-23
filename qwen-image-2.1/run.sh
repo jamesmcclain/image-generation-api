@@ -7,14 +7,24 @@
 #   comfyui  ComfyUI on HOST_PORT, default 8188
 #
 # Both modes mount the same host model directory (MODEL_DIR) read-only at
-# /models. It uses ComfyUI's folder layout; download the recommended files
-# (Comfy-Org's INT8 convrot set, ~17 GB, used by both modes) once with:
+# /models. It uses ComfyUI's folder layout. The modes share the diffusion
+# model and VAE but use different Qwen3-VL-8B text encoders (see the
+# Dockerfile for why). Download once with:
 #
+#   D=~/.cache/huggingface/qwen-image-2.1
 #   hf download Comfy-Org/Qwen-Image-2.1 \
 #     diffusion_models/qwen_image_2.1_int8_convrot.safetensors \
-#     text_encoders/qwen3vl_8b_int8_convrot.safetensors \
-#     vae/qwen_image_2.1_vae_bf16.safetensors \
-#     --local-dir ~/.cache/huggingface/qwen-image-2.1
+#     vae/qwen_image_2.1_vae_bf16.safetensors --local-dir "$D"
+#   # api mode's text encoder:
+#   hf download Qwen/Qwen3-VL-8B-Instruct-GGUF Qwen3VL-8B-Instruct-Q4_K_M.gguf \
+#     --local-dir "$D/text_encoders"
+#   # comfyui mode's text encoder:
+#   hf download Comfy-Org/Qwen-Image-2.1 \
+#     text_encoders/qwen3vl_8b_int8_convrot.safetensors --local-dir "$D"
+#
+# LLM_FILE must be a Qwen3-VL-**8B** encoder: the 4B one that Krea 2 uses
+# loads without complaint but produces text features of the wrong width for
+# Qwen-Image-2.1.
 #
 # Usage:
 #   ./qwen-image-2.1/run.sh                          # api mode, default MODEL_DIR
@@ -25,11 +35,12 @@
 #   OFFLOAD_TO_CPU=0 ./qwen-image-2.1/run.sh         # keep weights on the GPU
 #
 # GGUF diffusion models (e.g. to fit a smaller card) work in both modes and
-# mix freely with the safetensors text encoder and VAE. Put the .gguf in
-# MODEL_DIR/diffusion_models/, then:
+# mix freely with the other files. Put the .gguf in MODEL_DIR/diffusion_models/,
+# then:
 #   - api mode: name it with MODEL_FILE (relative to MODEL_DIR), e.g.
 #       MODEL_FILE=diffusion_models/qwen-image-2.1-Q4_K_M.gguf ./qwen-image-2.1/run.sh
-#     (LLM_FILE likewise accepts a Qwen3-VL-8B-Instruct GGUF text encoder.)
+#     (LLM_FILE likewise picks the text encoder, e.g. the larger
+#     text_encoders/Qwen3VL-8B-Instruct-Q8_0.gguf from the same Qwen repo.)
 #   - comfyui mode: in the workflow, replace the "Load Diffusion Model"
 #     (UNETLoader) node with "Unet Loader (GGUF)" and pick the file there.
 #
@@ -70,7 +81,7 @@ fi
 
 MODEL_FILE="${MODEL_FILE:-diffusion_models/qwen-image-2.1-Q4_0.gguf}"
 VAE_FILE="${VAE_FILE:-vae/qwen_image_2.1_vae_bf16.safetensors}"
-LLM_FILE="${LLM_FILE:-text_encoders/Qwen3-VL-8B-Instruct-Q4_K_M.gguf}"
+LLM_FILE="${LLM_FILE:-text_encoders/Qwen3VL-8B-Instruct-Q4_K_M.gguf}"
 
 if [ ! -d "${MODEL_DIR}" ]; then
     echo "Error: model directory ${MODEL_DIR} not found." >&2

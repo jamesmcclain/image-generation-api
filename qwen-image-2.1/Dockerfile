@@ -6,15 +6,31 @@
 #            between requests
 #   comfyui  ComfyUI on port 8188, with Qwen-Image-2.1 support built in
 #
-# Both modes read the SAME model files from a single /models mount, laid out
-# the way ComfyUI expects. The recommended set is Comfy-Org's INT8 convrot
-# files (~17 GB total; both stable-diffusion.cpp and ComfyUI run them natively):
+# Both modes read their model files from a single /models mount, laid out
+# the way ComfyUI expects. They share the diffusion model and VAE, but need
+# different text encoders (both Qwen3-VL-8B):
 #
+#   # shared: diffusion model + VAE (~8 GB)
 #   hf download Comfy-Org/Qwen-Image-2.1 \
 #     diffusion_models/qwen_image_2.1_int8_convrot.safetensors \
-#     text_encoders/qwen3vl_8b_int8_convrot.safetensors \
 #     vae/qwen_image_2.1_vae_bf16.safetensors \
 #     --local-dir /path/to/qwen-image-models
+#   # api mode's text encoder (~5 GB)
+#   hf download Qwen/Qwen3-VL-8B-Instruct-GGUF Qwen3VL-8B-Instruct-Q4_K_M.gguf \
+#     --local-dir /path/to/qwen-image-models/text_encoders
+#   # comfyui mode's text encoder (~9.4 GB)
+#   hf download Comfy-Org/Qwen-Image-2.1 text_encoders/qwen3vl_8b_int8_convrot.safetensors \
+#     --local-dir /path/to/qwen-image-models
+#
+# Why two text encoders: stable-diffusion.cpp (as of the pinned commit) can't
+# load Comfy-Org's qwen3vl_8b_int8_convrot.safetensors. That file also
+# quantizes the token-embedding table, and sd.cpp mistakes its
+# embed_tokens.weight_scale tensor for the embedding itself (hidden size
+# 151936, then GGML_ASSERT(scale_nelements == 1 || ...) at load), and its
+# Embedding layer can't apply int8 scales anyway. The GGUF is what sd.cpp's
+# own Qwen-Image-2.1 docs use. It must be the 8B model: Qwen-Image-2.1 was
+# trained on 4096-wide text features, and the 4B Qwen3-VL used by Krea 2
+# produces 2560-wide ones.
 #
 # Build (from the repo root):
 #   docker build -t qwen-image-api qwen-image-2.1/
@@ -144,13 +160,13 @@ COPY server.py entrypoint.sh extra_model_paths.yaml /app/
 RUN chmod +x /app/entrypoint.sh \
     && mkdir -p /data && chmod 1777 /data
 
-# API mode: the three model files. Defaults are Comfy-Org's INT8 convrot set
-# (see the top of this file). stable-diffusion.cpp also takes the bf16
-# safetensors, or GGUFs — e.g. unsloth's qwen-image-2.1-Q4_K_M.gguf as
-# MODEL_PATH plus a Qwen3-VL-8B-Instruct GGUF as LLM_PATH, for smaller cards.
-# Formats can be mixed freely, e.g. a GGUF diffusion model with the INT8
-# safetensors text encoder and the bf16 VAE. comfyui mode can load the same
-# GGUF diffusion model through the bundled "Unet Loader (GGUF)" node.
+# API mode: the three model files. Defaults are Comfy-Org's INT8 convrot
+# diffusion model, its bf16 VAE, and Qwen's Q4_K_M GGUF of Qwen3-VL-8B as the
+# text encoder (see the top of this file for why not the INT8 one).
+# stable-diffusion.cpp also takes the bf16 diffusion model, or GGUFs of it,
+# e.g. unsloth's qwen-image-2.1-Q4_K_M.gguf as MODEL_PATH for smaller cards,
+# and formats mix freely. comfyui mode can load the same GGUF diffusion model
+# through the bundled "Unet Loader (GGUF)" node.
 #
 # OFFLOAD_TO_CPU=1 keeps weights in system RAM and moves them onto the GPU as
 # they're needed; set it to 0 to keep everything resident on a 24 GB+ card.
@@ -165,7 +181,7 @@ RUN chmod +x /app/entrypoint.sh \
 # invoking host user (--user), who has no home directory in here.
 ENV MODEL_PATH=/models/diffusion_models/qwen_image_2.1_int8_convrot.safetensors \
     VAE_PATH=/models/vae/qwen_image_2.1_vae_bf16.safetensors \
-    LLM_PATH=/models/text_encoders/qwen3vl_8b_int8_convrot.safetensors \
+    LLM_PATH=/models/text_encoders/Qwen3VL-8B-Instruct-Q4_K_M.gguf \
     SD_SERVER=/app/sd-server \
     OFFLOAD_TO_CPU=1 \
     DIFFUSION_FA=1 \
