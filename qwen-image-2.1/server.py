@@ -1,6 +1,6 @@
 """REST API for Qwen-Image-2.1 text-to-image, served via Hugging Face diffusers.
 
-Same HTTP contract as the Krea 2 image (../server.py), so existing clients
+Same HTTP contract as the Krea 2 image (../krea2/server.py), so existing clients
 (including the krea2-api skill's scripts) work unchanged against either one.
 
 Qwen-Image-2.1 is a new architecture (single-stream 7B DiT + Qwen3-VL 8B text

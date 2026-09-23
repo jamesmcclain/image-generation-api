@@ -1,7 +1,7 @@
 # Dockerfile — Krea 2 Turbo (GGUF) text-to-image REST API via stable-diffusion.cpp
 #
-# Build:
-#   docker build -t krea2-api .
+# Build (from the repo root):
+#   docker build -t krea2-api krea2/
 #
 # Run (model weights are NOT baked in — they're large, multi-GB quantized
 # GGUF/safetensors files — so mount them from the host instead). Krea2
@@ -89,4 +89,4 @@ EXPOSE 5002
 
 CMD ["python3", "/app/server.py"]
 
-# docker build -t krea2-api .
+# docker build -t krea2-api krea2/

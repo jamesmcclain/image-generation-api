@@ -1,6 +1,6 @@
 # Dockerfile — Qwen-Image-2.1 text-to-image REST API via Hugging Face diffusers
 #
-# Serves the SAME REST API as the Krea 2 image in the repo root (POST
+# Serves the SAME REST API as the Krea 2 image in ../krea2/ (POST
 # /generate, GET /health on port 5002), so clients can point at either one.
 #
 # Build (from the repo root):
