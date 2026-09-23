@@ -26,7 +26,9 @@ case "$mode" in
         # Everything ComfyUI writes (outputs, inputs, user settings/workflows,
         # its database, custom nodes, temp files) goes under COMFYUI_DATA, so
         # the install in /opt/ComfyUI can stay read-only and owned by root.
-        mkdir -p "${COMFYUI_DATA}"
+        # custom_nodes must exist up front: ComfyUI's startup-script scan
+        # crashes on a fresh (empty) base directory without it.
+        mkdir -p "${COMFYUI_DATA}/custom_nodes"
         # shellcheck disable=SC2086  # COMFYUI_ARGS is intentionally word-split
         exec python3 /opt/ComfyUI/main.py \
             --listen "${COMFYUI_LISTEN:-0.0.0.0}" \

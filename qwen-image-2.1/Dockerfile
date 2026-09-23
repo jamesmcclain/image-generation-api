@@ -27,7 +27,8 @@
 #
 # https://huggingface.co/Qwen/Qwen-Image-2.1
 # https://huggingface.co/Comfy-Org/Qwen-Image-2.1
-# https://huggingface.co/unsloth/Qwen-Image-2.1-GGUF   (API mode only, see below)
+# https://huggingface.co/unsloth/Qwen-Image-2.1-GGUF   (GGUF diffusion models, see below)
+# https://github.com/leejet/ComfyUI-GGUF                (lets comfyui mode load them)
 # https://github.com/leejet/stable-diffusion.cpp/blob/master/docs/qwen_image_2.1.md
 
 # CUDA 12.8 is the oldest toolkit that can target RTX 50-series (sm_120);
@@ -106,8 +107,17 @@ RUN python3 -m venv /opt/venv && pip install flask
 #   --build-arg TORCH_INDEX_URL=https://download.pytorch.org/whl/cu128 \
 #   --build-arg TORCH_VERSION=2.11.0 --build-arg TORCHVISION_VERSION=0.26.0
 # at the cost of some of ComfyUI's newer optimizations.
+#
+# ComfyUI-GGUF adds the "Unet Loader (GGUF)" node so comfyui mode can use GGUF
+# diffusion models too. It's leejet's fork (the stable-diffusion.cpp author),
+# which added the qwen_image21 architecture that city96's original rejects as
+# "Unknown model architecture". It's installed under /opt/ComfyUI/custom_nodes
+# and registered via extra_model_paths.yaml, since --base-directory moves
+# ComfyUI's own custom_nodes folder to COMFYUI_DATA (where you can still add
+# your own).
 ARG WITH_COMFYUI=1
 ARG COMFYUI_REF=912fca4f39b875a0360f2c5170568176ea813ded
+ARG COMFYUI_GGUF_REF=edd981b10e107d3b8f58e16c498f2d08f631bc47
 ARG TORCH_VERSION=2.14.0
 ARG TORCHVISION_VERSION=0.29.0
 ARG TORCH_INDEX_URL=https://pypi.org/simple
@@ -119,6 +129,10 @@ RUN if [ "${WITH_COMFYUI}" = "1" ]; then \
         pip install --index-url "${TORCH_INDEX_URL}" \
             "torch==${TORCH_VERSION}" "torchvision==${TORCHVISION_VERSION}"; \
         pip install -r /opt/ComfyUI/requirements.txt; \
+        mkdir -p /opt/ComfyUI/custom_nodes/ComfyUI-GGUF; \
+        curl -fsSL "https://github.com/leejet/ComfyUI-GGUF/archive/${COMFYUI_GGUF_REF}.tar.gz" \
+            | tar -xz --strip-components=1 -C /opt/ComfyUI/custom_nodes/ComfyUI-GGUF; \
+        pip install -r /opt/ComfyUI/custom_nodes/ComfyUI-GGUF/requirements.txt; \
     fi
 
 # ---------------------------------------------------------------------------
@@ -134,8 +148,9 @@ RUN chmod +x /app/entrypoint.sh \
 # (see the top of this file). stable-diffusion.cpp also takes the bf16
 # safetensors, or GGUFs — e.g. unsloth's qwen-image-2.1-Q4_K_M.gguf as
 # MODEL_PATH plus a Qwen3-VL-8B-Instruct GGUF as LLM_PATH, for smaller cards.
-# (ComfyUI mode can't load GGUFs without a custom node, so keep the INT8 files
-# around if you use both modes.)
+# Formats can be mixed freely, e.g. a GGUF diffusion model with the INT8
+# safetensors text encoder and the bf16 VAE. comfyui mode can load the same
+# GGUF diffusion model through the bundled "Unet Loader (GGUF)" node.
 #
 # OFFLOAD_TO_CPU=1 keeps weights in system RAM and moves them onto the GPU as
 # they're needed; set it to 0 to keep everything resident on a 24 GB+ card.

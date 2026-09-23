@@ -24,17 +24,22 @@
 #   HOST_PORT=5003 ./qwen-image-2.1/run.sh           # run beside krea2-api
 #   OFFLOAD_TO_CPU=0 ./qwen-image-2.1/run.sh         # keep weights on the GPU
 #
-# API mode can use GGUFs instead (e.g. to fit a smaller card). Put them in
-# the same layout and name them with MODEL_FILE / LLM_FILE, which are
-# relative to MODEL_DIR:
-#   MODEL_FILE=diffusion_models/qwen-image-2.1-Q4_K_M.gguf \
-#   LLM_FILE=text_encoders/Qwen3-VL-8B-Instruct-UD-Q4_K_XL.gguf \
-#     ./qwen-image-2.1/run.sh
+# GGUF diffusion models (e.g. to fit a smaller card) work in both modes and
+# mix freely with the safetensors text encoder and VAE. Put the .gguf in
+# MODEL_DIR/diffusion_models/, then:
+#   - api mode: name it with MODEL_FILE (relative to MODEL_DIR), e.g.
+#       MODEL_FILE=diffusion_models/qwen-image-2.1-Q4_K_M.gguf ./qwen-image-2.1/run.sh
+#     (LLM_FILE likewise accepts a Qwen3-VL-8B-Instruct GGUF text encoder.)
+#   - comfyui mode: in the workflow, replace the "Load Diffusion Model"
+#     (UNETLoader) node with "Unet Loader (GGUF)" and pick the file there.
 #
 # ComfyUI mode keeps what it writes (outputs, uploaded inputs, workflows,
-# settings) in COMFYUI_DATA_DIR on the host, default
+# settings, extra custom nodes) in COMFYUI_DATA_DIR on the host, default
 # ~/.local/share/qwen-image-comfyui. Open http://localhost:8188 and load the
-# "Qwen Image 2.1" template from the workflow templates browser.
+# "Qwen Image 2.1" template from the workflow templates browser. With a GGUF
+# diffusion model on a 24 GB card, you can also set the text encoder's
+# "Load CLIP" node to device "cpu": it runs once per prompt, so this frees
+# ~9 GB of VRAM at little cost in speed.
 #
 # API example, from the host (or anywhere that can reach it):
 #   curl -X POST http://localhost:5002/generate \
@@ -63,9 +68,9 @@ if [ "${MODE}" = "api" ] && [ "$#" -gt 0 ] && [ "${1#-}" = "$1" ]; then
     shift
 fi
 
-MODEL_FILE="${MODEL_FILE:-diffusion_models/qwen_image_2.1_int8_convrot.safetensors}"
+MODEL_FILE="${MODEL_FILE:-diffusion_models/qwen-image-2.1-Q4_0.gguf}"
 VAE_FILE="${VAE_FILE:-vae/qwen_image_2.1_vae_bf16.safetensors}"
-LLM_FILE="${LLM_FILE:-text_encoders/qwen3vl_8b_int8_convrot.safetensors}"
+LLM_FILE="${LLM_FILE:-text_encoders/Qwen3-VL-8B-Instruct-Q4_K_M.gguf}"
 
 if [ ! -d "${MODEL_DIR}" ]; then
     echo "Error: model directory ${MODEL_DIR} not found." >&2

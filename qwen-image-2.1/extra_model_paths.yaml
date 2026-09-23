@@ -13,3 +13,9 @@ qwen_image_models:
   text_encoders: text_encoders
   vae: vae
   loras: loras
+
+# Custom nodes baked into the image (ComfyUI-GGUF, for .gguf diffusion
+# models). --base-directory points ComfyUI's own custom_nodes folder at
+# COMFYUI_DATA/custom_nodes, so this keeps the bundled ones loading too.
+bundled_custom_nodes:
+  custom_nodes: /opt/ComfyUI/custom_nodes
