@@ -3,7 +3,7 @@
 #
 #   /models/diffusion_models/qwen_image_2.1_int8_convrot.safetensors
 #   /models/text_encoders/qwen3vl_8b_int8_convrot.safetensors   (comfyui mode)
-#   /models/text_encoders/Qwen3VL-8B-Instruct-Q4_K_M.gguf       (api mode)
+#   /models/text_encoders/Qwen3-VL-8B-Instruct-Q4_K_M.gguf      (api mode)
 #   /models/vae/qwen_image_2.1_vae_bf16.safetensors
 #
 # ComfyUI also keeps its own (writable) models folder under COMFYUI_DATA, so

@@ -16,7 +16,7 @@
 #     vae/qwen_image_2.1_vae_bf16.safetensors \
 #     --local-dir /path/to/qwen-image-models
 #   # api mode's text encoder (~5 GB)
-#   hf download Qwen/Qwen3-VL-8B-Instruct-GGUF Qwen3VL-8B-Instruct-Q4_K_M.gguf \
+#   hf download unsloth/Qwen3-VL-8B-Instruct-GGUF Qwen3-VL-8B-Instruct-Q4_K_M.gguf \
 #     --local-dir /path/to/qwen-image-models/text_encoders
 #   # comfyui mode's text encoder (~9.4 GB)
 #   hf download Comfy-Org/Qwen-Image-2.1 text_encoders/qwen3vl_8b_int8_convrot.safetensors \
@@ -32,11 +32,18 @@
 # trained on 4096-wide text features, and the 4B Qwen3-VL used by Krea 2
 # produces 2560-wide ones.
 #
+# ComfyUI is the other way around: it only recognizes Qwen-Image-2.1's
+# Qwen3-VL-8B text encoder by its vision weights, which a GGUF text encoder
+# doesn't carry (ComfyUI-GGUF only attaches mmproj weights for Qwen2-VL). A
+# GGUF gets detected as plain Qwen3-8B and wired up as a different model's
+# encoder, so comfyui mode needs the .safetensors one.
+#
 # Build (from the repo root):
 #   docker build -t qwen-image-api qwen-image-2.1/
 #   docker build -t qwen-image-api --build-arg WITH_COMFYUI=0 qwen-image-2.1/   # API only, much smaller
 #
-# Run (or use qwen-image-2.1/run.sh, which does this for you):
+# Run (or use qwen-image-2.1/run.sh for api mode and
+# qwen-image-2.1/run-comfyui.sh for comfyui mode, which do this for you):
 #   docker run --gpus all -p 5002:5002 -v /path/to/qwen-image-models:/models:ro qwen-image-api
 #   docker run --gpus all -p 8188:8188 -v /path/to/qwen-image-models:/models:ro \
 #     -v /path/to/comfyui-data:/data qwen-image-api comfyui
@@ -177,11 +184,12 @@ RUN chmod +x /app/entrypoint.sh \
 # inputs, workflows, settings); mount a host directory there to keep them.
 # COMFYUI_ARGS is appended to ComfyUI's command line (e.g. "--lowvram").
 #
-# HOME points somewhere writable because run.sh starts the container as the
-# invoking host user (--user), who has no home directory in here.
+# HOME points somewhere writable because run.sh and run-comfyui.sh start the
+# container as the invoking host user (--user), who has no home directory in
+# here.
 ENV MODEL_PATH=/models/diffusion_models/qwen_image_2.1_int8_convrot.safetensors \
     VAE_PATH=/models/vae/qwen_image_2.1_vae_bf16.safetensors \
-    LLM_PATH=/models/text_encoders/Qwen3VL-8B-Instruct-Q4_K_M.gguf \
+    LLM_PATH=/models/text_encoders/Qwen3-VL-8B-Instruct-Q4_K_M.gguf \
     SD_SERVER=/app/sd-server \
     OFFLOAD_TO_CPU=1 \
     DIFFUSION_FA=1 \

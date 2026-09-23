@@ -15,8 +15,8 @@ Qwen-Image-2.1 needs three files (loaded via separate sd-server flags):
                      bf16 safetensors, or an unsloth GGUF
   --vae              qwen_image_2.1_vae_bf16.safetensors (NOT the Qwen-Image
                      1.x or Wan VAE: they aren't interchangeable)
-  --llm              Qwen3-VL-8B text encoder: a GGUF (default: Qwen's
-                     Qwen3VL-8B-Instruct-Q4_K_M.gguf) or Comfy-Org's bf16
+  --llm              Qwen3-VL-8B text encoder: a GGUF (default: unsloth's
+                     Qwen3-VL-8B-Instruct-Q4_K_M.gguf) or Comfy-Org's bf16
                      safetensors. NOT Comfy-Org's int8_convrot one, which
                      sd.cpp mis-loads (see the Dockerfile), and NOT the 4B
                      model Krea 2 uses (wrong feature width for this model).
