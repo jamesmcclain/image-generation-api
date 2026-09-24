@@ -50,7 +50,7 @@ CONTAINER_NAME="${CONTAINER_NAME:-qwen-image-api}"
 HOST_PORT="${HOST_PORT:-5002}"
 
 MODEL_DIR="${1:-${MODEL_DIR:-${HOME}/.cache/huggingface/qwen-image-2.1}}"
-MODEL_FILE="${MODEL_FILE:-diffusion_models/qwen_image_2.1_int8_convrot.safetensors}"
+MODEL_FILE="${MODEL_FILE:-diffusion_models/qwen-image-2.1-Q4_0.gguf}"
 VAE_FILE="${VAE_FILE:-vae/qwen_image_2.1_vae_bf16.safetensors}"
 LLM_FILE="${LLM_FILE:-text_encoders/Qwen3-VL-8B-Instruct-Q4_K_M.gguf}"
 
