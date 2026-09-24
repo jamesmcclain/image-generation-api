@@ -1,10 +1,10 @@
 ---
-name: krea2-api
-description: Use this skill whenever the user wants an image generated from a text prompt (e.g. "generate an image of...", "make a picture of...", "draw..."), via the local Krea 2 Turbo text-to-image REST API. Covers issuing /generate requests via a helper script, required parameters and safe defaults (especially cfg), reading back the resulting PNG, and diagnosing the most common failure modes (wrong cfg, generation timeouts, unhealthy service).
+name: image-generation-api
+description: Use this skill whenever the user wants an image generated from a text prompt (e.g. "generate an image of...", "make a picture of...", "draw..."), via a local text-to-image REST API. Covers issuing /generate requests via a helper script, required parameters and safe defaults (especially cfg), reading back the resulting PNG, and diagnosing the most common failure modes (wrong cfg, generation timeouts, unhealthy service).
 license: Proprietary. LICENSE.txt has complete terms
 ---
 
-# Krea 2 API Guide
+# Image Generation API Guide
 
 ## Overview
 
