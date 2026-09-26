@@ -15,8 +15,10 @@
 #     diffusion_models/qwen_image_2.1_int8_convrot.safetensors \
 #     vae/qwen_image_2.1_vae_bf16.safetensors \
 #     --local-dir /path/to/qwen-image-models
-#   # api mode's text encoder (~5 GB)
-#   hf download unsloth/Qwen3-VL-8B-Instruct-GGUF Qwen3-VL-8B-Instruct-Q4_K_M.gguf \
+#   # api mode's text encoder (~5 GB) and its vision weights (~1 GB, needed
+#   # only for reference editing)
+#   hf download unsloth/Qwen3-VL-8B-Instruct-GGUF \
+#     Qwen3-VL-8B-Instruct-Q4_K_M.gguf mmproj-BF16.gguf \
 #     --local-dir /path/to/qwen-image-models/text_encoders
 #   # comfyui mode's text encoder (~9.4 GB)
 #   hf download Comfy-Org/Qwen-Image-2.1 text_encoders/qwen3vl_8b_int8_convrot.safetensors \
@@ -30,7 +32,9 @@
 # Embedding layer can't apply int8 scales anyway. The GGUF is what sd.cpp's
 # own Qwen-Image-2.1 docs use. It must be the 8B model: Qwen-Image-2.1 was
 # trained on 4096-wide text features, and the 4B Qwen3-VL used by Krea 2
-# produces 2560-wide ones.
+# produces 2560-wide ones. A GGUF text encoder has no vision weights, which
+# image editing needs, so api mode also loads Qwen3-VL-8B's mmproj GGUF
+# (VISION_PATH, passed to sd-server as --llm_vision) when it's present.
 #
 # ComfyUI is the other way around: it only recognizes Qwen-Image-2.1's
 # Qwen3-VL-8B text encoder by its vision weights, which a GGUF text encoder
@@ -103,6 +107,7 @@ FROM nvidia/cuda:${CUDA_VERSION}-runtime-ubuntu24.04
 
 # python3-venv: Ubuntu 24.04's system Python is "externally managed", so all
 # Python packages go in a venv. libgomp1: OpenMP runtime for sd-server/sd-cli.
+# Pillow: server.py validates, orients and normalizes input images with it.
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates \
     curl \
@@ -117,7 +122,7 @@ ENV VIRTUAL_ENV=/opt/venv \
     PIP_DISABLE_PIP_VERSION_CHECK=1 \
     PYTHONUNBUFFERED=1
 
-RUN python3 -m venv /opt/venv && pip install flask
+RUN python3 -m venv /opt/venv && pip install flask pillow
 
 # --- ComfyUI (optional: --build-arg WITH_COMFYUI=0 skips it) ---------------
 # Qwen-Image-2.1 (and its INT8 convrot / KV-cache / prefetch support) landed in
@@ -185,9 +190,12 @@ COPY server.py entrypoint.sh extra_model_paths.yaml /app/
 RUN chmod +x /app/entrypoint.sh \
     && mkdir -p /data && chmod 1777 /data
 
-# API mode: the three model files. Defaults are Comfy-Org's INT8 convrot
-# diffusion model, its bf16 VAE, and Qwen's Q4_K_M GGUF of Qwen3-VL-8B as the
-# text encoder (see the top of this file for why not the INT8 one).
+# API mode: the three model files, plus the optional vision weights for
+# reference editing. Defaults are Comfy-Org's INT8 convrot diffusion model,
+# its bf16 VAE, Qwen's Q4_K_M GGUF of Qwen3-VL-8B as the text encoder (see the
+# top of this file for why not the INT8 one), and unsloth's mmproj-BF16.gguf
+# as its vision weights. An empty or missing VISION_PATH disables reference
+# editing only (GET /health reports "edit": false).
 # stable-diffusion.cpp also takes the bf16 diffusion model, or GGUFs of it,
 # e.g. unsloth's qwen-image-2.1-Q4_K_M.gguf as MODEL_PATH for smaller cards,
 # and formats mix freely. comfyui mode can load the same GGUF diffusion model
@@ -208,6 +216,7 @@ RUN chmod +x /app/entrypoint.sh \
 ENV MODEL_PATH=/models/diffusion_models/qwen_image_2.1_int8_convrot.safetensors \
     VAE_PATH=/models/vae/qwen_image_2.1_vae_bf16.safetensors \
     LLM_PATH=/models/text_encoders/Qwen3-VL-8B-Instruct-Q4_K_M.gguf \
+    VISION_PATH=/models/text_encoders/mmproj-BF16.gguf \
     SD_SERVER=/app/sd-server \
     OFFLOAD_TO_CPU=1 \
     DIFFUSION_FA=1 \

@@ -5,15 +5,21 @@
 # run-comfyui.sh instead (same image, same model directory).
 #
 # The container mounts a host model directory (MODEL_DIR) read-only at
-# /models, in ComfyUI's folder layout. API mode needs three files; download
-# them once with:
+# /models, in ComfyUI's folder layout. API mode needs three files, plus a
+# fourth (the text encoder's vision weights, mmproj-BF16.gguf) for reference
+# editing; download them once with:
 #
 #   D=~/.cache/huggingface/qwen-image-2.1
 #   hf download Comfy-Org/Qwen-Image-2.1 \
 #     diffusion_models/qwen_image_2.1_int8_convrot.safetensors \
 #     vae/qwen_image_2.1_vae_bf16.safetensors --local-dir "$D"
-#   hf download unsloth/Qwen3-VL-8B-Instruct-GGUF Qwen3-VL-8B-Instruct-Q4_K_M.gguf \
+#   hf download unsloth/Qwen3-VL-8B-Instruct-GGUF \
+#     Qwen3-VL-8B-Instruct-Q4_K_M.gguf mmproj-BF16.gguf \
 #     --local-dir "$D/text_encoders"
+#
+# The vision weights are optional: without them, text-to-image and img2img
+# (one input image plus "strength") still work, and GET /health reports
+# "edit": false. Set VISION_FILE= (empty) to run without them on purpose.
 #
 # The text encoder must be a GGUF (or Comfy-Org's bf16 safetensors), not
 # Comfy-Org's int8_convrot one, which stable-diffusion.cpp mis-loads (see the
@@ -27,7 +33,8 @@
 #   HOST_PORT=5003 ./qwen-image-2.1/run.sh           # run beside krea2-api
 #   OFFLOAD_TO_CPU=0 ./qwen-image-2.1/run.sh         # keep weights on the GPU
 #
-# MODEL_FILE / VAE_FILE / LLM_FILE pick the files, relative to MODEL_DIR.
+# MODEL_FILE / VAE_FILE / LLM_FILE / VISION_FILE pick the files, relative to
+# MODEL_DIR.
 # GGUF diffusion models (e.g. to fit a smaller card) mix freely with the
 # other files, e.g.
 #   MODEL_FILE=diffusion_models/qwen-image-2.1-Q4_0.gguf ./qwen-image-2.1/run.sh
@@ -39,6 +46,10 @@
 #     -H "Content-Type: application/json" \
 #     -d '{"prompt": "a red fox sitting in fresh snow, golden hour, photorealistic"}' \
 #     -o output.png
+#
+# Editing: add "images": [<base64 PNG/JPEG/WebP>, ...] (1 or 2) to the same
+# JSON body and refer to them in the prompt as <image1>, <image2>. Adding
+# "strength" (0-1) with one image does img2img instead. See server.py.
 #
 # The first request after startup waits for the weights to load (GET
 # /health returns {"status": "loading"} until then).
@@ -53,6 +64,9 @@ MODEL_DIR="${1:-${MODEL_DIR:-${HOME}/.cache/huggingface/qwen-image-2.1}}"
 MODEL_FILE="${MODEL_FILE:-diffusion_models/qwen-image-2.1-Q4_0.gguf}"
 VAE_FILE="${VAE_FILE:-vae/qwen_image_2.1_vae_bf16.safetensors}"
 LLM_FILE="${LLM_FILE:-text_encoders/Qwen3-VL-8B-Instruct-Q4_K_M.gguf}"
+# ${VAR-default}, not ${VAR:-default}: an explicitly empty VISION_FILE means
+# "no vision weights".
+VISION_FILE="${VISION_FILE-text_encoders/mmproj-BF16.gguf}"
 
 for f in "${MODEL_FILE}" "${VAE_FILE}" "${LLM_FILE}"; do
     if [ ! -f "${MODEL_DIR}/${f}" ]; then
@@ -61,6 +75,18 @@ for f in "${MODEL_FILE}" "${VAE_FILE}" "${LLM_FILE}"; do
         exit 1
     fi
 done
+
+# Optional: without vision weights the server still runs, minus reference
+# editing, so a missing file is a warning rather than an error.
+VISION_PATH=""
+if [ -n "${VISION_FILE}" ]; then
+    if [ -f "${MODEL_DIR}/${VISION_FILE}" ]; then
+        VISION_PATH="/models/${VISION_FILE}"
+    else
+        echo "Warning: vision weights not found at ${MODEL_DIR}/${VISION_FILE};" >&2
+        echo "reference editing will be unavailable (set VISION_FILE= to silence this)." >&2
+    fi
+fi
 
 # Build the image if it doesn't already exist locally. The build context is
 # this script's own directory, so it works from any working directory.
@@ -77,6 +103,7 @@ docker run -it --rm \
     -e MODEL_PATH="/models/${MODEL_FILE}" \
     -e VAE_PATH="/models/${VAE_FILE}" \
     -e LLM_PATH="/models/${LLM_FILE}" \
+    -e VISION_PATH="${VISION_PATH}" \
     -e OFFLOAD_TO_CPU="${OFFLOAD_TO_CPU:-1}" \
     -e SD_EXTRA_ARGS="${SD_EXTRA_ARGS:-}" \
     -p "${HOST_PORT}:5002" \

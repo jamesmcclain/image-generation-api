@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Generate one image via POST /generate.
+"""Generate one image via POST /generate, optionally from input images.
 
 Uses `requests` so there's no shell-quoting of prompts and no need to
 inspect the raw response with `file` afterward -- this script does that
@@ -11,12 +11,27 @@ Usage:
     generate.py "..." --out output.png --width 1647 --height 926 --seed 42
     generate.py "..." --out output.png --host localhost --port 5003
 
+Input images (Qwen-Image-2.1 server only; `health_check.py` shows whether
+the server supports them):
+    generate.py "make <image1> a watercolor painting" --image in.png --out out.png
+    generate.py "put the shirt from <image2> on the person in <image1>" \
+        --image person.png --image shirt.png --out out.png
+    generate.py "a snowy version of this scene" --image in.jpg --strength 0.6 --out out.png
+
+--image (repeatable) sends reference images for editing; the prompt refers
+to them as <image1>, <image2> in order. Adding --strength (0-1) with a single
+--image does img2img instead. With input images, omitting --width/--height
+makes the output follow the first image's aspect ratio.
+
 --host/--port pick the server (default 10.0.2.2:5002, the address this skill
 has always used).
 
 Guards against the cfg trap: refuses to send cfg=0.0 unless you pass
 --force-cfg-zero, since that value silently ignores the prompt with no
 error from the server.
+
+Also rejects locally: --strength without exactly one --image, and --image
+files that can't be read.
 
 Also guards against the known VRAM ceiling (RTX 4090, empirically
 determined): 1232x1232 square, 1647x926 widescreen, 926x1647 portrait.
@@ -30,6 +45,7 @@ Exit codes:
     4 -> network/other error
 """
 import argparse
+import base64
 import sys
 
 import requests
@@ -67,6 +83,10 @@ def main() -> int:
     ap.add_argument("--width", type=int, default=None)
     ap.add_argument("--height", type=int, default=None)
     ap.add_argument("--seed", type=int, default=None)
+    ap.add_argument("--image", action="append", default=[], metavar="PATH",
+                    help="Input image (repeatable, in <image1>, <image2> order)")
+    ap.add_argument("--strength", type=float, default=None,
+                    help="img2img strength, 0-1; requires exactly one --image")
     ap.add_argument(
         "--force-cfg-zero",
         action="store_true",
@@ -88,9 +108,28 @@ def main() -> int:
         )
         return 2
 
+    if args.strength is not None and len(args.image) != 1:
+        print("REJECTED_LOCAL --strength (img2img) requires exactly one --image")
+        return 2
+    if args.strength is not None and not 0.0 < args.strength <= 1.0:
+        print("REJECTED_LOCAL --strength must be > 0 and <= 1")
+        return 2
+
+    images = []
+    for path in args.image:
+        try:
+            with open(path, "rb") as f:
+                images.append(base64.b64encode(f.read()).decode("ascii"))
+        except OSError as e:
+            print(f"REJECTED_LOCAL cannot read --image {path}: {e}")
+            return 2
+
     w = args.width or 1024
     h = args.height or 1024
-    if (args.width or args.height) and _over_ceiling(w, h):
+    # With input images, a missing dimension is derived server-side from the
+    # first image, so only a fully explicit size can be checked here.
+    size_known = (args.width and args.height) if images else (args.width or args.height)
+    if size_known and _over_ceiling(w, h):
         print(
             f"REJECTED_LOCAL {w}x{h} exceeds every known ceiling "
             f"(1232x1232 square, 1647x926 widescreen, 926x1647 portrait)"
@@ -108,6 +147,10 @@ def main() -> int:
         payload["height"] = args.height
     if args.seed is not None:
         payload["seed"] = args.seed
+    if images:
+        payload["images"] = images
+    if args.strength is not None:
+        payload["strength"] = args.strength
 
     try:
         r = requests.post(f"{base_url(args.host, args.port)}/generate", json=payload, timeout=args.timeout)
