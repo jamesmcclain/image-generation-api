@@ -22,8 +22,15 @@ POST /generate
 
   Returns: image/png bytes on success, JSON error on failure.
 
+  The Qwen-Image-2.1 server's image-input extensions (`images`, `strength`)
+  aren't supported here: Krea 2 Turbo has no editing mode. A request that
+  uses them gets a 400 rather than a text-to-image result that silently
+  ignores the input images.
+
 GET /health
-  Returns: {"status": "ok"} once all three model paths are confirmed to exist.
+  Returns: {"status": "ok", "img2img": false, "edit": false, "max_images": 0}
+  once all three model paths are confirmed to exist. The feature fields match
+  the Qwen-Image-2.1 server's, so clients can check before sending images.
 """
 
 import os
@@ -51,7 +58,7 @@ def health():
     missing = _missing_paths()
     if missing:
         return jsonify(status="error", missing=missing), 503
-    return jsonify(status="ok")
+    return jsonify(status="ok", img2img=False, edit=False, max_images=0)
 
 
 @app.post("/generate")
@@ -61,6 +68,11 @@ def generate():
     prompt = body.get("prompt")
     if not prompt:
         return jsonify(error="'prompt' is required"), 400
+
+    # An empty or null list is the same as leaving the field out.
+    if body.get("images") or body.get("strength") is not None:
+        return jsonify(error="this server (Krea 2) doesn't accept input images: "
+                             "'images' and 'strength' need the Qwen-Image-2.1 server"), 400
 
     steps = int(body.get("steps", 8))
     # NOTE: 0.0 is NOT "CFG off but still conditioned" — stable-diffusion.cpp

@@ -11,7 +11,12 @@ has always used).
 
 Prints one terse line:
     OK
+    OK edit=yes img2img=yes max_images=2
     NOT_READY <detail>
+
+The feature fields appear when the server reports them: whether it accepts
+input images for reference editing ("edit") or img2img, and how many. When
+edit=no, the reason follows it.
 
 Exit codes:
     0 -> ready
@@ -56,7 +61,14 @@ def main() -> int:
         return 4
 
     if body.get("status") == "ok":
-        print("OK")
+        line = "OK"
+        if "edit" in body:
+            yn = lambda v: "yes" if v else "no"
+            line += (f" edit={yn(body['edit'])} img2img={yn(body.get('img2img'))}"
+                     f" max_images={body.get('max_images', 0)}")
+            if body.get("edit_error"):
+                line += f" edit_error={body['edit_error']!r}"
+        print(line)
         return 0
 
     print(f"NOT_READY {body}")
